@@ -316,7 +316,7 @@ class TestControllers(BaseTestCase):
         response = requests.models.Response()
         response.status_code = 404
         requests.get = MagicMock(return_value=response)
-        test=Test(TestPlatform.windows,TestType.commit,1,"master","1978060bf7d2edd119736ba3ba88341f3bec3323")
+        test = Test(TestPlatform.windows, TestType.commit, 1, "master", "1978060bf7d2edd119736ba3ba88341f3bec3323")
         g.db.add(test)
         g.db.commit()
         kvm_processor(self.app, mock_g.db, "test", TestPlatform.linux, repo, None)
