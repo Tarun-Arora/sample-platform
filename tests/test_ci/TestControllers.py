@@ -187,13 +187,14 @@ class TestControllers(BaseTestCase):
         mock_log.critical.assert_called_once()
         self.assertEqual(mock_log.debug.call_count, 1)
 
-    @mock.patch('zipfile.ZipFile')
     @mock.patch('run.log.critical')
     @mock.patch('mod_ci.controllers.save_xml_to_file')
     @mock.patch('builtins.open', new_callable=mock.mock_open())
     @mock.patch('mod_ci.controllers.g')
-    def test_kvm_processor(self, mock_g, mock_open_file, mock_save_xml, mock_log_critical, mock_zipfile):
+    def test_kvm_processor(self, mock_g, mock_open_file, mock_save_xml, mock_log_critical):
         """Test kvm_processor function."""
+        import zipfile
+
         import libvirt
         import requests
 
@@ -230,8 +231,20 @@ class TestControllers(BaseTestCase):
             r = fakeData[0]
             fakeData.pop(0)
             return r
+
+        class mock_zip:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                return False
+
+            def extractall(*args, **kwargs):
+                return None
+
         libvirt.open = MagicMock(return_value=mock_conn)
         repo = MagicMock()
+        zipfile.ZipFile = MagicMock(return_value=mock_zip())
         fakeData = [{'artifacts': [{'name': "CCExtractor Linux build",
                                     'archive_download_url': "test",
                                     'workflow_run': {'head_sha': '1978060bf7d2edd119736ba3ba88341f3bec3322'}}]},
@@ -244,7 +257,6 @@ class TestControllers(BaseTestCase):
         requests.get = MagicMock(return_value=response)
         kvm_processor(self.app, mock_g.db, "test", TestPlatform.linux, repo, None)
         mock_save_xml.assert_called()
-        mock_zipfile.assert_called()
         assert mock.call("Could not find an artifact for this commit") not in mock_log_critical.mock_calls
 
     @mock.patch('run.log.critical')

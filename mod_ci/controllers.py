@@ -6,10 +6,10 @@ import json
 import os
 import shutil
 import sys
+import zipfile
 from multiprocessing import Process
 from pathlib import Path
 from typing import Any
-from zipfile import ZipFile
 
 import requests
 from flask import (Blueprint, abort, flash, g, jsonify, redirect, request,
@@ -338,7 +338,7 @@ def kvm_processor(app, db, kvm_name, platform, repository, delay) -> None:
 
             open(os.path.join(base_folder, 'ccextractor.zip'), 'wb').write(r.content)
 
-            with ZipFile(os.path.join(base_folder, 'ccextractor.zip'), 'r') as artifact_zip:
+            with zipfile.ZipFile(os.path.join(base_folder, 'ccextractor.zip'), 'r') as artifact_zip:
                 artifact_zip.extractall(base_folder)
 
             artifact_saved = True
