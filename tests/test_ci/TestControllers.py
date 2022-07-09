@@ -292,12 +292,14 @@ class TestControllers(BaseTestCase):
             fakeData.pop(0)
             return r
 
+        from mod_ci.controllers import Artifact_names
+
         libvirt.open = MagicMock(return_value=mock_conn)
         repo = MagicMock()
-        fakeData = [{'artifacts': [{'name': "CCExtractor Linux build",
+        fakeData = [{'artifacts': [{'name': Artifact_names.linux,
                                     'archive_download_url': "test",
                                     'workflow_run': {'head_sha': '1978060bf7d2edd119736ba3ba88341f3bec3322'}}]},
-                    {'artifacts': [{'name': "CCExtractor Linux build",
+                    {'artifacts': [{'name': Artifact_names.linux,
                                     'archive_download_url': "test",
                                     'workflow_run': {'head_sha': '1978060bf7d2edd119736ba3ba88341f3bec3323'}}]}]
         repo.actions.artifacts.return_value.get = getFakeData

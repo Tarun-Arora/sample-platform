@@ -35,7 +35,7 @@ call robocopy %srcDir% %dstDir% /e /MIR /XD %srcDir%\.git >> "%logFile%"
 call :executeCommand cd %dstDir%
 
 echo Compile CCX
-call :postStatus "building" "Compiling CCExtractor"
+call :postStatus "building" "Checking for CCExtractor build artifact"
 if EXIST "ccextractorwinfull.exe" (
     rem Run testsuite
     echo Run tests
