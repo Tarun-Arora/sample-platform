@@ -323,6 +323,7 @@ def kvm_processor(app, db, kvm_name, platform, repository, delay) -> None:
         artifact_name = Artifact_names.linux
     else:
         artifact_name = Artifact_names.windows
+
     for index, artifact in enumerate(artifacts):
         if artifact['name'] == artifact_name and artifact["workflow_run"]["head_sha"] == test.commit:
             artifact_url = artifact["archive_download_url"]
@@ -337,7 +338,6 @@ def kvm_processor(app, db, kvm_name, platform, repository, delay) -> None:
                 return
 
             open(os.path.join(base_folder, 'ccextractor.zip'), 'wb').write(r.content)
-
             with zipfile.ZipFile(os.path.join(base_folder, 'ccextractor.zip'), 'r') as artifact_zip:
                 artifact_zip.extractall(base_folder)
 
