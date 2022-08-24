@@ -145,6 +145,7 @@ class TestControllers(BaseTestCase):
         self.assertEqual(2, mock_log.info.call_count)
         mock_log.info.assert_called_with("Windows GCP instances process kicked off")
         mock_delete_expired_instances.assert_called_once()
+
     # @mock.patch('run.log')
     # def test_kvm_processor_empty_kvm_name(self, mock_log):
     #     """Test that kvm processor fails with empty kvm name."""
@@ -156,24 +157,25 @@ class TestControllers(BaseTestCase):
     #     mock_log.info.assert_called_once()
     #     mock_log.critical.assert_called_once()
 
-    # @mock.patch('run.log')
-    # @mock.patch('mod_ci.controllers.MaintenanceMode')
-    # def test_gcp_instance_maintenance_mode(self, mock_maintenance, mock_log):
-    #     """Test that gcp instance does not run when in maintainenace."""
-    #     from mod_ci.controllers import gcp_instance
-    #
-    #     class MockMaintence:
-    #         def __init__(self):
-    #             self.disabled = True
-    #
-    #     mock_maintenance.query.filter.return_value.first.return_value = MockMaintence()
-    #
-    #     resp = gcp_instance(mock.ANY, mock.ANY, "test", mock.ANY, 1)
-    #
-    #     self.assertIsNone(resp)
-    #     mock_log.info.assert_called_once()
-    #     mock_log.critical.assert_not_called()
-    #     self.assertEqual(mock_log.debug.call_count, 2)
+
+    @mock.patch('run.log')
+    @mock.patch('mod_ci.controllers.MaintenanceMode')
+    def test_gcp_instance_maintenance_mode(self, mock_maintenance, mock_log):
+        """Test that gcp instance does not run when in maintainenace."""
+        from mod_ci.controllers import gcp_instance
+
+        class MockMaintence:
+            def __init__(self):
+                self.disabled = True
+
+        mock_maintenance.query.filter.return_value.first.return_value = MockMaintence()
+
+        resp = gcp_instance(mock.ANY, mock.ANY, "test", mock.ANY, 1)
+
+        self.assertIsNone(resp)
+        mock_log.info.assert_called_once()
+        mock_log.critical.assert_not_called()
+        self.assertEqual(mock_log.debug.call_count, 2)
 
     # @mock.patch('mod_ci.controllers.libvirt')
     # @mock.patch('run.log')
