@@ -152,11 +152,11 @@ class TestControllers(BaseTestCase):
         """Test that gcp instance does not run when in maintainenace."""
         from mod_ci.controllers import gcp_instance
 
-        class MockMaintence:
+        class MockMaintenance:
             def __init__(self):
                 self.disabled = True
 
-        mock_maintenance.query.filter.return_value.first.return_value = MockMaintence()
+        mock_maintenance.query.filter.return_value.first.return_value = MockMaintenance()
 
         resp = gcp_instance(mock.ANY, mock.ANY, "test", mock.ANY, 1)
 
@@ -432,41 +432,29 @@ class TestControllers(BaseTestCase):
         assert is_main_repo('random_user/random_repo') is False
         assert is_main_repo('test_owner/test_repo') is True
 
-    # @mock.patch('github.GitHub')
-    # @mock.patch('git.Repo')
-    # @mock.patch('libvirt.open')
-    # @mock.patch('shutil.rmtree')
-    # @mock.patch('mod_ci.controllers.open')
-    # @mock.patch('lxml.etree')
-    # def test_customize_tests_run_on_selected_regression_tests(self, mock_etree, mock_open,
-    #                                                           mock_rmtree, mock_libvirt, mock_repo, mock_git):
-    #     """Test customize tests running on the selected regression tests."""
-    #     self.create_user_with_role(
-    #         self.user.name, self.user.email, self.user.password, Role.tester)
-    #     self.create_forktest("own-fork-commit", TestPlatform.linux, regression_tests=[2])
-    #     import mod_ci.controllers
-    #     import mod_ci.cron
-    #     reload(mod_ci.cron)
-    #     reload(mod_ci.controllers)
-    #     from mod_ci.cron import cron
-    #     conn = mock_libvirt()
-    #     vm = conn.lookupByName()
-    #     import libvirt
-    #     vm.info.return_value = [libvirt.VIR_DOMAIN_SHUTOFF]
-    #     vm.hasCurrentSnapshot.return_value = 1
-    #     repo = mock_repo()
-    #     origin = repo.remote()
-    #     from collections import namedtuple
-    #     Remotes = namedtuple('Remotes', 'name')
-    #     repo.remotes = [Remotes(name='fork_2')]
-    #     GitPullInfo = namedtuple('GitPullInfo', 'flags')
-    #     pull_info = GitPullInfo(flags=0)
-    #     origin.pull.return_value = [pull_info]
-    #     single_test = mock_etree.Element('tests')
-    #     mock_etree.Element.return_value = single_test
-    #     cron(testing=True)
-    #     mock_etree.SubElement.assert_any_call(single_test, 'entry', id=str(2))
-    #     assert (single_test, 'entry', str(1)) not in mock_etree.call_args_list
+    @mock.patch('mod_ci.controllers.wait_for_operation')
+    @mock.patch('mod_ci.controllers.delete_instance')
+    @mock.patch('mod_ci.controllers.get_running_instances')
+    def test_delete_expired_instances(self, mock_get_running_instances, mock_delete_instance, mock_wait_for_operation):
+        """Test working of delete_expired_instances function."""
+        from datetime import datetime, timedelta, timezone
+
+        from mod_ci.controllers import delete_expired_instances
+
+        expired_instance_time = datetime.now(timezone.utc) - timedelta(minutes=150)
+        mock_get_running_instances.return_value = [{
+            'name': 'windows-1',
+            'creationTimestamp': datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f%z"),
+        }, {
+            'name': 'linux-2',
+            'creationTimestamp': expired_instance_time.strftime("%Y-%m-%dT%H:%M:%S.%f%z"),
+        }, {
+            'name': 'osx-3',
+            'creationTimestamp': datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f%z"),
+        }]
+        delete_expired_instances('a', 120, 'a', 'a')
+        mock_delete_instance.assert_called_once()
+        mock_wait_for_operation.assert_called_once()
 
     def test_customizedtest_added_to_queue(self):
         """Test queue with a customized test addition."""
