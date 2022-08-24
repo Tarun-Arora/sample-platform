@@ -111,33 +111,40 @@ class TestControllers(BaseTestCase):
             for stat in stats:
                 self.assertEqual(stat.success, None)
 
-    # @mock.patch('mod_ci.controllers.Process')
-    # @mock.patch('run.log')
-    # def test_start_platform_none_specified(self, mock_log, mock_process):
-    #     """Test that both platforms run with no platform value is passed."""
-    #     start_platforms(mock.ANY, mock.ANY)
+    @mock.patch('mod_ci.controllers.delete_expired_instances')
+    @mock.patch('mod_ci.controllers.Process')
+    @mock.patch('run.log')
+    def test_start_platform_none_specified(self, mock_log, mock_process, mock_delete_expired_instances):
+        """Test that both platforms run with no platform value is passed."""
+        start_platforms(mock.ANY, mock.ANY)
 
-    #     self.assertEqual(2, mock_process.call_count)
-    #     self.assertEqual(4, mock_log.info.call_count)
+        mock_delete_expired_instances.assert_called_once()
+        self.assertEqual(2, mock_process.call_count)
+        self.assertEqual(4, mock_log.info.call_count)
 
-    # @mock.patch('mod_ci.controllers.Process')
-    # @mock.patch('run.log')
-    # def test_start_platform_linux_specified(self, mock_log, mock_process):
-    #     """Test that only linux platform runs."""
-    #     start_platforms(mock.ANY, mock.ANY, platform=TestPlatform.linux)
+    @mock.patch('mod_ci.controllers.delete_expired_instances')
+    @mock.patch('mod_ci.controllers.Process')
+    @mock.patch('run.log')
+    def test_start_platform_linux_specified(self, mock_log, mock_process, mock_delete_expired_instances):
+        """Test that only linux platform runs."""
+        start_platforms(mock.ANY, mock.ANY, platform=TestPlatform.linux)
 
-    #     self.assertEqual(1, mock_process.call_count)
-    #     self.assertEqual(2, mock_log.info.call_count)
-    #     mock_log.info.assert_called_with("Linux VM process kicked off")
-    # @mock.patch('mod_ci.controllers.Process')
-    # @mock.patch('run.log')
-    # def test_start_platform_windows_specified(self, mock_log, mock_process):
-    #     """Test that only windows platform runs."""
-    #     start_platforms(mock.ANY, mock.ANY, platform=TestPlatform.windows)
+        self.assertEqual(1, mock_process.call_count)
+        self.assertEqual(2, mock_log.info.call_count)
+        mock_log.info.assert_called_with("Linux GCP instances process kicked off")
+        mock_delete_expired_instances.assert_called_once()
 
-    #     self.assertEqual(1, mock_process.call_count)
-    #     self.assertEqual(2, mock_log.info.call_count)
-    #     mock_log.info.assert_called_with("Windows VM process kicked off")
+    @mock.patch('mod_ci.controllers.delete_expired_instances')
+    @mock.patch('mod_ci.controllers.Process')
+    @mock.patch('run.log')
+    def test_start_platform_windows_specified(self, mock_log, mock_process, mock_delete_expired_instances):
+        """Test that only windows platform runs."""
+        start_platforms(mock.ANY, mock.ANY, platform=TestPlatform.windows)
+
+        self.assertEqual(1, mock_process.call_count)
+        self.assertEqual(2, mock_log.info.call_count)
+        mock_log.info.assert_called_with("Windows GCP instances process kicked off")
+        mock_delete_expired_instances.assert_called_once()
     # @mock.patch('run.log')
     # def test_kvm_processor_empty_kvm_name(self, mock_log):
     #     """Test that kvm processor fails with empty kvm name."""
