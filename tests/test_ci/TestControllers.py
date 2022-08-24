@@ -116,7 +116,7 @@ class TestControllers(BaseTestCase):
     @mock.patch('run.log')
     def test_start_platform_none_specified(self, mock_log, mock_process, mock_delete_expired_instances):
         """Test that both platforms run with no platform value is passed."""
-        start_platforms(mock.ANY, mock.ANY)
+        start_platforms(mock.ANY, mock.ANY, 1)
 
         mock_delete_expired_instances.assert_called_once()
         self.assertEqual(2, mock_process.call_count)
@@ -146,17 +146,6 @@ class TestControllers(BaseTestCase):
         mock_log.info.assert_called_with("Windows GCP instances process kicked off")
         mock_delete_expired_instances.assert_called_once()
 
-    # @mock.patch('run.log')
-    # def test_kvm_processor_empty_kvm_name(self, mock_log):
-    #     """Test that kvm processor fails with empty kvm name."""
-    #     from mod_ci.controllers import kvm_processor
-
-    #     resp = kvm_processor(mock.ANY, mock.ANY, "", mock.ANY, mock.ANY, mock.ANY)
-
-    #     self.assertIsNone(resp)
-    #     mock_log.info.assert_called_once()
-    #     mock_log.critical.assert_called_once()
-
     @mock.patch('run.log')
     @mock.patch('mod_ci.controllers.MaintenanceMode')
     def test_gcp_instance_maintenance_mode(self, mock_maintenance, mock_log):
@@ -176,34 +165,59 @@ class TestControllers(BaseTestCase):
         mock_log.critical.assert_not_called()
         self.assertEqual(mock_log.debug.call_count, 2)
 
-    # @mock.patch('mod_ci.controllers.libvirt')
-    # @mock.patch('run.log')
-    # @mock.patch('mod_ci.controllers.MaintenanceMode')
-    # def test_kvm_processor_conn_fail(self, mock_maintenance, mock_log, mock_libvirt):
-    #     """Test that kvm processor logs critically when conn cannot be established."""
-    #     from mod_ci.controllers import kvm_processor
+    @mock.patch('mod_ci.controllers.wait_for_operation')
+    @mock.patch('mod_ci.controllers.create_instance')
+    @mock.patch('builtins.open', new_callable=mock.mock_open())
+    @mock.patch('mod_ci.controllers.g')
+    def test_start_test(self, mock_g, mock_open_file, mock_create_instance, mock_wait_for_operation):
+        """Test start_test function."""
+        import zipfile
 
-    #     mock_libvirt.open.return_value = None
-    #     mock_maintenance.query.filter.return_value.first.return_value = None
+        import requests
+        from googleapiclient.discovery import build
+        from googleapiclient.http import HttpMock, RequestMockBuilder
 
-    #     resp = kvm_processor(mock.ANY, mock.ANY, "test", mock.ANY, mock.ANY, 1)
+        from mod_ci.controllers import Artifact_names, start_test
+        test = Test.query.first()
+        repo = MagicMock()
+        fakeData = [{'artifacts': [{'name': Artifact_names.windows, 'archive_download_url': "test",
+                                    'workflow_run': {'head_sha': '1978060bf7d2edd119736ba3ba88341f3bec3322'}}]},
+                    {'artifacts': [{'name': Artifact_names.linux, 'archive_download_url': "test",
+                                    'workflow_run': {'head_sha': '1978060bf7d2edd119736ba3ba88341f3bec3323'}}]}]
 
-    #     self.assertIsNone(resp)
-    #     mock_log.info.assert_called_once()
-    #     mock_log.critical.assert_called_once()
-    #     self.assertEqual(mock_log.debug.call_count, 1)
+        def getFakeData(*args, **kwargs):
+            if len(fakeData) == 0:
+                return {'artifacts': []}
+            r = fakeData[0]
+            fakeData.pop(0)
+            return r
+
+        class mock_zip:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                return False
+
+            def extractall(*args, **kwargs):
+                return None
+        repo.actions.artifacts.return_value.get = getFakeData
+        response = requests.models.Response()
+        response.status_code = 200
+        requests.get = MagicMock(return_value=response)
+        zipfile.ZipFile = MagicMock(return_value=mock_zip())
+        start_test(mock.ANY, self.app, mock_g.db, repo, test, mock.ANY)
+        mock_create_instance.assert_called_once()
+        mock_wait_for_operation.assert_called_once()
 
     # @mock.patch('run.log.critical')
     # @mock.patch('mod_ci.controllers.save_xml_to_file')
     # @mock.patch('builtins.open', new_callable=mock.mock_open())
     # @mock.patch('mod_ci.controllers.g')
-    # def test_kvm_processor(self, mock_g, mock_open_file, mock_save_xml, mock_log_critical):
-    #     """Test kvm_processor function."""
+    # def test_start_test(self, mock_g, mock_open_file, mock_save_xml, mock_log_critical):
+    #     """Test start_test function."""
     #     import zipfile
-
-    #     import libvirt
     #     import requests
-
     #     from mod_ci.controllers import Artifact_names, kvm_processor
 
     #     class mock_conn:
@@ -231,12 +245,12 @@ class TestControllers(BaseTestCase):
     #         def close(*args):
     #             return
 
-    #     def getFakeData(*args, **kwargs):
-    #         if len(fakeData) == 0:
-    #             return {'artifacts': []}
-    #         r = fakeData[0]
-    #         fakeData.pop(0)
-    #         return r
+        # def getFakeData(*args, **kwargs):
+        #     if len(fakeData) == 0:
+        #         return {'artifacts': []}
+        #     r = fakeData[0]
+        #     fakeData.pop(0)
+        #     return r
 
     #     class mock_zip:
     #         def __enter__(self):
@@ -261,7 +275,7 @@ class TestControllers(BaseTestCase):
     #     response = requests.models.Response()
     #     response.status_code = 200
     #     requests.get = MagicMock(return_value=response)
-    #     kvm_processor(self.app, mock_g.db, "test", TestPlatform.linux, repo, None)
+    #     start_test(self.app, mock_g.db, "test", TestPlatform.linux, repo, None)
     #     mock_save_xml.assert_called()
     #     assert mock.call("Could not find an artifact for this commit") not in mock_log_critical.mock_calls
 
