@@ -157,7 +157,6 @@ class TestControllers(BaseTestCase):
     #     mock_log.info.assert_called_once()
     #     mock_log.critical.assert_called_once()
 
-
     @mock.patch('run.log')
     @mock.patch('mod_ci.controllers.MaintenanceMode')
     def test_gcp_instance_maintenance_mode(self, mock_maintenance, mock_log):
