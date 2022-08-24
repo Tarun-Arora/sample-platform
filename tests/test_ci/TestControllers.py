@@ -174,6 +174,24 @@ class TestControllers(BaseTestCase):
         mock_log.critical.assert_not_called()
         self.assertEqual(mock_log.debug.call_count, 2)
 
+    @mock.patch('mod_ci.controllers.delete_expired_instances')
+    @mock.patch('mod_ci.controllers.get_compute_service_object')
+    @mock.patch('mod_ci.controllers.gcp_instance')
+    def test_cron_job(self, mock_gcp_instance, mock_get_compute_service_object, mock_delete_expired_instances):
+        """Test working of cron function."""
+        from mod_ci.cron import cron
+        # Test cron with testing = false
+        cron()
+        self.assertEqual(mock_delete_expired_instances.call_count, 2)
+        self.assertEqual(mock_get_compute_service_object.call_count, 2)
+        mock_delete_expired_instances.reset_mock()
+        mock_get_compute_service_object.reset_mock()
+
+        # Test cron with testing = true
+        cron(testing=True)
+        mock_delete_expired_instances.assert_not_called()
+        mock_get_compute_service_object.assert_not_called()
+
     @mock.patch('mod_ci.controllers.wait_for_operation')
     @mock.patch('mod_ci.controllers.create_instance')
     @mock.patch('builtins.open', new_callable=mock.mock_open())
