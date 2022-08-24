@@ -180,6 +180,7 @@ class TestControllers(BaseTestCase):
     def test_cron_job(self, mock_gcp_instance, mock_get_compute_service_object, mock_delete_expired_instances):
         """Test working of cron function."""
         from mod_ci.cron import cron
+
         # Test cron with testing = false
         cron()
         self.assertEqual(mock_delete_expired_instances.call_count, 2)
