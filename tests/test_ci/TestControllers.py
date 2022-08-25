@@ -264,6 +264,23 @@ class TestControllers(BaseTestCase):
         compute = get_compute_service_object()
         self.assertEqual(type(compute), googleapiclient.discovery.Resource)
 
+    @mock.patch('builtins.open', new_callable=mock.mock_open())
+    def test_create_instance_linux(self, mock_open_file):
+        """Test create_instance function for linux platform."""
+        from mod_ci.controllers import create_instance
+        compute = MagicMock()
+        instance = create_instance(compute, "test", "test", Test.query.get(1), "")
+
+    @mock.patch('builtins.open', new_callable=mock.mock_open())
+    def test_create_instance_windows(self, mock_open_file):
+        """Test create_instance function for windows platform."""
+        from mod_ci.controllers import create_instance
+        compute = MagicMock()
+        new_test = Test(TestPlatform.windows, TestType.commit, 1, "test", "test")
+        g.db.add(new_test)
+        g.db.commit()
+        instance = create_instance(compute, "test", "test", new_test, "")
+
     @mock.patch('mod_ci.controllers.GeneralData')
     @mock.patch('mod_ci.controllers.g')
     def test_set_avg_time_first(self, mock_g, mock_gd):
