@@ -238,74 +238,21 @@ class TestControllers(BaseTestCase):
         mock_create_instance.assert_called_once()
         mock_wait_for_operation.assert_called_once()
 
-    # @mock.patch('run.log.critical')
-    # @mock.patch('mod_ci.controllers.save_xml_to_file')
-    # @mock.patch('builtins.open', new_callable=mock.mock_open())
-    # @mock.patch('mod_ci.controllers.g')
-    # def test_start_test(self, mock_g, mock_open_file, mock_save_xml, mock_log_critical):
-    #     """Test start_test function."""
-    #     import zipfile
-    #     import requests
-    #     from mod_ci.controllers import Artifact_names, kvm_processor
+    @mock.patch('mod_ci.controllers.start_test')
+    @mock.patch('mod_ci.controllers.get_compute_service_object')
+    @mock.patch('mod_ci.controllers.g')
+    def test_gcp_instance(self, mock_g, mock_get_compute_service_object, mock_start_test):
+        """Test gcp_instance function."""
+        from mod_ci.controllers import gcp_instance
 
-    #     class mock_conn:
-    #         def lookupByName(*args):
-    #             class mock_vm:
-    #                 def hasCurrentSnapshot(*args):
-    #                     return 1
+        # Making a sample test invalid
+        test = Test.query.get(1)
+        test.pr_nr = 0
+        g.db.commit()
+        gcp_instance(self.app, mock_g.db, TestPlatform.linux, mock.ANY, None)
 
-    #                 def info(*args):
-    #                     return [libvirt.VIR_DOMAIN_SHUTOFF]
-
-    #                 def snapshotCurrent(*args):
-    #                     class snapshot:
-    #                         def getName(*args):
-    #                             return "test"
-    #                     return snapshot
-
-    #                 def revertToSnapshot(*args):
-    #                     return 1
-
-    #                 def create(*args):
-    #                     return 1
-    #             return mock_vm
-
-    #         def close(*args):
-    #             return
-
-        # def getFakeData(*args, **kwargs):
-        #     if len(fakeData) == 0:
-        #         return {'artifacts': []}
-        #     r = fakeData[0]
-        #     fakeData.pop(0)
-        #     return r
-
-    #     class mock_zip:
-    #         def __enter__(self):
-    #             return self
-
-    #         def __exit__(self, *args):
-    #             return False
-
-    #         def extractall(*args, **kwargs):
-    #             return None
-
-    #     libvirt.open = MagicMock(return_value=mock_conn)
-    #     repo = MagicMock()
-    #     zipfile.ZipFile = MagicMock(return_value=mock_zip())
-    #     fakeData = [{'artifacts': [{'name': Artifact_names.windows,
-    #                                 'archive_download_url': "test",
-    #                                 'workflow_run': {'head_sha': '1978060bf7d2edd119736ba3ba88341f3bec3322'}}]},
-    #                 {'artifacts': [{'name': Artifact_names.linux,
-    #                                 'archive_download_url': "test",
-    #                                 'workflow_run': {'head_sha': '1978060bf7d2edd119736ba3ba88341f3bec3323'}}]}]
-    #     repo.actions.artifacts.return_value.get = getFakeData
-    #     response = requests.models.Response()
-    #     response.status_code = 200
-    #     requests.get = MagicMock(return_value=response)
-    #     start_test(self.app, mock_g.db, "test", TestPlatform.linux, repo, None)
-    #     mock_save_xml.assert_called()
-    #     assert mock.call("Could not find an artifact for this commit") not in mock_log_critical.mock_calls
+        mock_start_test.assert_called_once()
+        mock_get_compute_service_object.assert_called_once()
 
     # @mock.patch('run.log.critical')
     # @mock.patch('mod_ci.controllers.save_xml_to_file')
