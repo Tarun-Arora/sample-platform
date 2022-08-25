@@ -254,69 +254,15 @@ class TestControllers(BaseTestCase):
         mock_start_test.assert_called_once()
         mock_get_compute_service_object.assert_called_once()
 
-    # @mock.patch('run.log.critical')
-    # @mock.patch('mod_ci.controllers.save_xml_to_file')
-    # @mock.patch('builtins.open', new_callable=mock.mock_open())
-    # @mock.patch('mod_ci.controllers.g')
-    # def test_kvm_processor_download_artifact_failed(self, mock_g, mock_open_file, mock_save_xml, mock_log_critical):
-    #     """Test kvm_processor function when downloading the artifact fails."""
-    #     import libvirt
-    #     import requests
+    def test_get_compute_service_object(self):
+        """Test get_compute_service_object function."""
+        import googleapiclient
+        from google.oauth2 import service_account
 
-    #     from mod_ci.controllers import Artifact_names, kvm_processor
-
-    #     class mock_conn:
-    #         def lookupByName(*args):
-    #             class mock_vm:
-    #                 def hasCurrentSnapshot(*args):
-    #                     return 1
-
-    #                 def info(*args):
-    #                     return [libvirt.VIR_DOMAIN_SHUTOFF]
-
-    #                 def snapshotCurrent(*args):
-    #                     class snapshot:
-    #                         def getName(*args):
-    #                             return "test"
-
-    #                     return snapshot
-
-    #                 def revertToSnapshot(*args):
-    #                     return 1
-
-    #                 def create(*args):
-    #                     return 1
-
-    #             return mock_vm
-
-    #         def close(*args):
-    #             return
-
-    #     def getFakeData(*args, **kwargs):
-    #         if len(fakeData) == 0:
-    #             return {'artifacts': []}
-    #         r = fakeData[0]
-    #         fakeData.pop(0)
-    #         return r
-
-    #     libvirt.open = MagicMock(return_value=mock_conn)
-    #     repo = MagicMock()
-    #     fakeData = [{'artifacts': [{'name': Artifact_names.windows,
-    #                                 'archive_download_url': "test",
-    #                                 'workflow_run': {'head_sha': '1978060bf7d2edd119736ba3ba88341f3bec3322'}}]},
-    #                 {'artifacts': [{'name': Artifact_names.windows,
-    #                                 'archive_download_url': "test",
-    #                                 'workflow_run': {'head_sha': '1978060bf7d2edd119736ba3ba88341f3bec3323'}}]}]
-    #     repo.actions.artifacts.return_value.get = getFakeData
-    #     response = requests.models.Response()
-    #     response.status_code = 404
-    #     requests.get = MagicMock(return_value=response)
-    #     test = Test(TestPlatform.windows, TestType.commit, 1, "master", "1978060bf7d2edd119736ba3ba88341f3bec3323")
-    #     g.db.add(test)
-    #     g.db.commit()
-    #     kvm_processor(self.app, mock_g.db, "test", TestPlatform.windows, repo, None)
-    #     mock_save_xml.assert_called()
-    #     mock_log_critical.assert_called_with(f"Could not fetch artifact, response code: {response.status_code}")
+        from mod_ci.controllers import get_compute_service_object
+        service_account.Credentials.from_service_account_file = MagicMock()
+        compute = get_compute_service_object()
+        self.assertEqual(type(compute), googleapiclient.discovery.Resource)
 
     @mock.patch('mod_ci.controllers.GeneralData')
     @mock.patch('mod_ci.controllers.g')
