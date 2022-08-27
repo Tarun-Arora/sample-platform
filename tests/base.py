@@ -98,8 +98,8 @@ def load_config(file):
         'KVM_WINDOWS_NAME': "window-test",
         'SECRET_KEY': secret_key,
         'CSRF_SESSION_KEY': secret_csrf,
-        'ZONE': "test",
-        'PROJECT_NAME': "test"
+        'ZONE': "test_zone",
+        'PROJECT_NAME': "test_zone"
     }
 
 
