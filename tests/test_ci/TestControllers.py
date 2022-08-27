@@ -117,7 +117,7 @@ class TestControllers(BaseTestCase):
     @mock.patch('run.log')
     def test_start_platform_none_specified(self, mock_log, mock_process,
                                            mock_delete_expired_instances, mock_get_compute_service_object):
-        """Test that both platforms run with no platform value is passed."""
+        """Test that both platforms run when no platform value is passed."""
         start_platforms(mock.ANY, mock.ANY, 1)
 
         mock_delete_expired_instances.assert_called_once()
@@ -131,7 +131,7 @@ class TestControllers(BaseTestCase):
     @mock.patch('run.log')
     def test_start_platform_linux_specified(self, mock_log, mock_process,
                                             mock_delete_expired_instances, mock_get_compute_service_object):
-        """Test that only linux platform runs."""
+        """Test that only Linux platform runs when platform is specified as Linux."""
         start_platforms(mock.ANY, mock.ANY, platform=TestPlatform.linux)
 
         self.assertEqual(1, mock_process.call_count)
@@ -146,7 +146,7 @@ class TestControllers(BaseTestCase):
     @mock.patch('run.log')
     def test_start_platform_windows_specified(self, mock_log, mock_process,
                                               mock_delete_expired_instances, mock_get_compute_service_object):
-        """Test that only windows platform runs."""
+        """Test that only Windows platform runs when platform is specified as Windows."""
         start_platforms(mock.ANY, mock.ANY, platform=TestPlatform.windows)
 
         self.assertEqual(1, mock_process.call_count)
