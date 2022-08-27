@@ -177,18 +177,25 @@ class TestControllers(BaseTestCase):
     @mock.patch('mod_ci.controllers.delete_expired_instances')
     @mock.patch('mod_ci.controllers.get_compute_service_object')
     @mock.patch('mod_ci.controllers.gcp_instance')
-    def test_cron_job(self, mock_gcp_instance, mock_get_compute_service_object, mock_delete_expired_instances):
-        """Test working of cron function."""
+    def test_cron_job_testing_false(self, mock_gcp_instance, mock_get_compute_service_object,
+                                    mock_delete_expired_instances):
+        """Test working of cron function when testing is disabled."""
         from mod_ci.cron import cron
-
-        # Test cron with testing = false
-        cron()
-        self.assertEqual(mock_delete_expired_instances.call_count, 2)
-        self.assertEqual(mock_get_compute_service_object.call_count, 2)
         mock_delete_expired_instances.reset_mock()
         mock_get_compute_service_object.reset_mock()
+        cron()
+        self.assertEqual(mock_delete_expired_instances.call_count, 1)
+        self.assertEqual(mock_get_compute_service_object.call_count, 1)
 
-        # Test cron with testing = true
+    @mock.patch('mod_ci.controllers.delete_expired_instances')
+    @mock.patch('mod_ci.controllers.get_compute_service_object')
+    @mock.patch('mod_ci.controllers.gcp_instance')
+    def test_cron_job_testing_true(self, mock_gcp_instance, mock_get_compute_service_object,
+                                   mock_delete_expired_instances):
+        """Test working of cron function when testing is enabled."""
+        from mod_ci.cron import cron
+        mock_delete_expired_instances.reset_mock()
+        mock_get_compute_service_object.reset_mock()
         cron(testing=True)
         mock_delete_expired_instances.assert_not_called()
         mock_get_compute_service_object.assert_not_called()
