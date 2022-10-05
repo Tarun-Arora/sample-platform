@@ -72,7 +72,7 @@ def generate_keys():
 
 
 def mock_gcs_client(file):
-    """"""
+    """Mock Google Cloud Storage Client object."""
     class gcs_client:
         def bucket(bucket_name):
             return None
@@ -110,7 +110,7 @@ def load_config(file):
 
 
 def mock_api_request_github(url, data=None, timeout=None, auth=None):
-    """Mock all responses to the Github API."""
+    """Mock all responses to the GitHub API."""
     if url == "https://api.github.com/repos/test/test_repo/commits/abcdef":
         return MockResponse({}, 200)
     elif url == "https://api.github.com/user":
