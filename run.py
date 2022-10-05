@@ -66,6 +66,7 @@ sa_file = os.path.join(app.config.get('INSTALL_FOLDER', ''), app.config.get('SER
 storage_client = storage.Client.from_service_account_json(sa_file)
 storage_client_bucket = storage_client.bucket(app.config.get('GCS_BUCKET_NAME', ''))
 
+
 def load_secret_keys(application: Flask, secret_session: str = 'secret_key',
                      secret_csrf: str = 'secret_csrf') -> None:
     """
