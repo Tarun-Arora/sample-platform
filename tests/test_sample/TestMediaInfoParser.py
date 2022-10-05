@@ -109,9 +109,8 @@ class TestMediaInfoFetcher(BaseTestCase):
 
     def test__process_track_not_ordereddict(self):
         """Test _process_track method for invalid track."""
-        return
         MOCK_MediaInfoFetcher.reset_mock()
-        track = {}
+        track = {'@type': 'InvalidTrack'}
 
         result = MediaInfoFetcher._process_track(MOCK_MediaInfoFetcher, track)
 
