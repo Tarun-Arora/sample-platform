@@ -8,6 +8,7 @@ from flask import redirect
 
 ROOT_DIR = path.dirname(path.abspath(__file__))
 
+
 def serve_file_download(file_name, file_folder, file_sub_folder='') -> werkzeug.wrappers.response.Response:
     """
     Serve file download by redirecting using Signed Download URLs.
