@@ -71,6 +71,14 @@ def generate_keys():
     return {'secret_csrf_path': secret_csrf_path, 'secret_key_path': secret_key_path}
 
 
+def mock_gcs_client(file):
+    """"""
+    class gcs_client:
+        def bucket(bucket_name):
+            return None
+    return gcs_client
+
+
 def load_config(file):
     """Load start config."""
     key_paths = generate_keys()
@@ -174,8 +182,9 @@ def generate_git_api_header(event, sig):
 class BaseTestCase(TestCase):
     """Base setup for all test cases."""
 
+    @mock.patch('google.cloud.storage.Client.from_service_account_json', side_effect=mock_gcs_client)
     @mock.patch('config_parser.parse_config', side_effect=load_config)
-    def create_app(self, mock_config):
+    def create_app(self, mock_config, mock_storage_client):
         """Create an instance of the app with the testing configuration."""
         user = namedtuple('user', "name password email github_token")
         self.user = user(name="test", password="test123",
