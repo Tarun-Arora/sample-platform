@@ -75,7 +75,17 @@ def mock_gcs_client(file):
     """Mock Google Cloud Storage Client object."""
     class gcs_client:
         def bucket(bucket_name):
-            return None
+            class bucket:
+                def blob(file_path):
+                    class blob:
+                        def patch():
+                            pass
+
+                        def generate_signed_url(**kwargs):
+                            return "https://www.test.com"
+                        content_disposition = None
+                    return blob
+            return bucket
     return gcs_client
 
 
@@ -105,7 +115,8 @@ def load_config(file):
         'SECRET_KEY': secret_key,
         'CSRF_SESSION_KEY': secret_csrf,
         'ZONE': "test_zone",
-        'PROJECT_NAME': "test_zone"
+        'PROJECT_NAME': "test_zone",
+        'GCS_SIGNED_URL_EXPIRY_LIMIT': 720
     }
 
 
