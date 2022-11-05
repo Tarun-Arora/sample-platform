@@ -675,7 +675,8 @@ def schedule_test(gh_commit, commit, test_type, branch="master", pr_nr=0) -> Non
                 log.critical(f'Could not post to GitHub! Response: {a.response}')
 
 
-def deschedule_test(gh_commit, commit, test_type, platform, branch="master", pr_nr=0, message="Tests have been cancelled", state=Status.FAILURE) -> None:
+def deschedule_test(gh_commit, commit, test_type, platform, branch="master", pr_nr=0,
+                    message="Tests have been cancelled", state=Status.FAILURE) -> None:
     """
     Post status to GitHub (default: as failure due to Github Actions incompletion).
 
@@ -1031,7 +1032,10 @@ def start_ci():
 
                     if has_failed:
                         # no runs to be scheduled since build failed
-                        test_type = TestType.pull_request if payload['workflow_run']['event'] == "pull_request" else TestType.commit;
+                        if payload['workflow_run']['event'] == "pull_request":
+                            test_type = TestType.pull_request
+                        else:
+                            test_type = TestType.commit
                         deschedule_test(github_status, commit_hash, test_type, TestPlatform.linux,
                                         message="Cancelling tests as Github Action(s) failed")
                         deschedule_test(github_status, commit_hash, test_type, TestPlatform.windows,
@@ -1056,14 +1060,16 @@ def start_ci():
                                         queue_test(github_status, commit_hash, TestType.pull_request,
                                                    TestPlatform.linux, pr_nr=pull_request['number'])
                                     else:
-                                        deschedule_test(github_status, commit_hash, TestType.pull_request, TestPlatform.linux,
-                                                        message="Not ran - no code changes", state=Status.SUCCESS)
+                                        deschedule_test(github_status, commit_hash, TestType.pull_request,
+                                                        TestPlatform.linux, message="Not ran - no code changes",
+                                                        state=Status.SUCCESS)
                                     if builds['windows']:
                                         queue_test(github_status, commit_hash, TestType.pull_request,
                                                    TestPlatform.windows, pr_nr=pull_request['number'])
                                     else:
-                                        deschedule_test(github_status, commit_hash, TestType.pull_request, TestPlatform.windows,
-                                                        message="Not ran - no code changes", state=Status.SUCCESS)
+                                        deschedule_test(github_status, commit_hash, TestType.pull_request,
+                                                        TestPlatform.windows, message="Not ran - no code changes",
+                                                        state=Status.SUCCESS)
                                     return json.dumps({'msg': 'EOL'})
                             # Either PR head commit was updated or PR was closed, therefore cancelling tests
                             deschedule_test(github_status, commit_hash, TestType.pull_request, TestPlatform.linux,
