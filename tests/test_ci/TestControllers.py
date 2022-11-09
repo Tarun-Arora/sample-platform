@@ -1137,8 +1137,8 @@ class TestControllers(BaseTestCase):
         schedule_test(GitHub('1').repos('1')('1').statuses('1'), 1, TestType.commit)
         mock_critical.assert_called()
         mock_critical.reset_mock()
-        deschedule_test(GitHub('1').repos('1')('1').statuses('1'),1, TestType.commit, TestPlatform.linux)
-        deschedule_test(GitHub('1').repos('1')('1').statuses('1'),1, TestType.commit, TestPlatform.windows)
+        deschedule_test(GitHub('1').repos('1')('1').statuses('1'), 1, TestType.commit, TestPlatform.linux)
+        deschedule_test(GitHub('1').repos('1')('1').statuses('1'), 1, TestType.commit, TestPlatform.windows)
         mock_critical.assert_called()
 
     @mock.patch('mod_ci.controllers.is_main_repo')
