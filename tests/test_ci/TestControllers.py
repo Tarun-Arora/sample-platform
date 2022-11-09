@@ -241,6 +241,9 @@ class TestControllers(BaseTestCase):
         response.status_code = 200
         requests.get = MagicMock(return_value=response)
         zipfile.ZipFile = MagicMock(return_value=mock_zip())
+        customized_test = CustomizedTest(1, 1)
+        g.db.add(customized_test)
+        g.db.commit()
         start_test(mock.ANY, self.app, mock_g.db, repo, test, mock.ANY)
         mock_create_instance.assert_called_once()
         mock_wait_for_operation.assert_called_once()
