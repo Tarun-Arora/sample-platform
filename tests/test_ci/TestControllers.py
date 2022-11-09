@@ -1093,9 +1093,9 @@ class TestControllers(BaseTestCase):
         from mod_ci.controllers import deschedule_test
         repository = git_mock(access_token=g.github['bot_token']).repos(
             g.github['repository_owner'])(g.github['repository'])
-        deschedule_test(repository.statuses(1), TestPlatform.linux)
+        deschedule_test(repository.statuses(1), 1, TestType.commit, TestPlatform.linux)
         mock_debug.assert_not_called()
-        deschedule_test(None, TestPlatform.linux)
+        deschedule_test(None, 1, TestType.commit, TestPlatform.linux)
         mock_debug.assert_not_called()
 
     @mock.patch('run.log.critical')
@@ -1106,9 +1106,9 @@ class TestControllers(BaseTestCase):
         from mod_ci.controllers import deschedule_test
         repository = git_mock(access_token=g.github['bot_token']).repos(
             g.github['repository_owner'])(g.github['repository'])
-        deschedule_test(repository.statuses(1), TestPlatform.windows)
+        deschedule_test(repository.statuses(1), 1, TestType.commit, TestPlatform.windows)
         mock_debug.assert_not_called()
-        deschedule_test(None, TestPlatform.windows)
+        deschedule_test(None, 1, TestType.commit, TestPlatform.windows)
         mock_debug.assert_not_called()
 
     @mock.patch('mod_ci.controllers.inform_mailing_list')
@@ -1134,10 +1134,11 @@ class TestControllers(BaseTestCase):
         from github import GitHub
 
         from mod_ci.controllers import deschedule_test, schedule_test
-        schedule_test(GitHub('1').repos('1')('1').statuses('1'), 1, None)
+        schedule_test(GitHub('1').repos('1')('1').statuses('1'), 1, TestType.commit)
         mock_critical.assert_called()
         mock_critical.reset_mock()
-        deschedule_test(GitHub('1').repos('1')('1').statuses('1'), TestPlatform.linux)
+        deschedule_test(GitHub('1').repos('1')('1').statuses('1'),1, TestType.commit, TestPlatform.linux)
+        deschedule_test(GitHub('1').repos('1')('1').statuses('1'),1, TestType.commit, TestPlatform.windows)
         mock_critical.assert_called()
 
     @mock.patch('mod_ci.controllers.is_main_repo')

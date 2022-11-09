@@ -716,9 +716,10 @@ def deschedule_test(gh_commit, commit, test_type, platform, branch="master", pr_
                                            Test.pr_nr == pr_nr
                                            )).first()
 
-    progress = TestProgress(platform_test.id, TestStatus.canceled, message, datetime.datetime.now())
-    g.db.add(progress)
-    g.db.commit()
+    if platform_test is not None:
+        progress = TestProgress(platform_test.id, TestStatus.canceled, message, datetime.datetime.now())
+        g.db.add(progress)
+        g.db.commit()
 
     if gh_commit is not None:
         try:
