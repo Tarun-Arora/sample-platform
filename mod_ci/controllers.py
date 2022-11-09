@@ -675,7 +675,7 @@ def schedule_test(gh_commit, commit, test_type, branch="master", pr_nr=0) -> Non
                 log.critical(f'Could not post to GitHub! Response: {a.response}')
 
 
-def deschedule_test(gh_commit, commit, test_type, platform, branch="master", pr_nr=0,
+def deschedule_test(gh_commit, commit, test_type, platform, branch="master",
                     message="Tests have been cancelled", state=Status.FAILURE) -> None:
     """
     Post status to GitHub (default: as failure due to Github Actions incompletion).
@@ -690,8 +690,6 @@ def deschedule_test(gh_commit, commit, test_type, platform, branch="master", pr_
     :type platform: TestPlatform
     :param branch: Branch name
     :type branch: str
-    :param pr_nr: Pull Request number, if applicable.
-    :type pr_nr: int
     :param message: The message to be posted to GitHub
     :type message: str
     :param state: The status badge of the test
@@ -713,7 +711,6 @@ def deschedule_test(gh_commit, commit, test_type, platform, branch="master", pr_
                                            Test.fork_id == fork.id,
                                            Test.test_type == test_type,
                                            Test.branch == branch,
-                                           Test.pr_nr == pr_nr
                                            )).first()
 
     if platform_test is not None:
