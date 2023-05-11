@@ -761,17 +761,12 @@ class TestControllers(BaseTestCase):
     @mock.patch('github.Github.get_repo')
     @mock.patch('mod_ci.controllers.queue_test')
     @mock.patch('requests.get', side_effect=mock_api_request_github)
-    def test_webhook_workflow_run_completed_successful_linux(self, mock_requests, mock_queue_test, mock_repo):
+    def test_webhook_workflow_run_completed_successful_linux(self, mock_request, mock_queue_test, mock_repo):
         """Test webhook triggered with workflow run event with action completed and status success on linux."""
         data = {'action': 'completed',
                 'workflow_run': {'event': 'push',
                                  'name': Workflow_builds.LINUX, 'head_sha': '1',
                                  'head_branch': 'master'}, 'sender': {'login': 'test_owner'}}
-        fakedata = {'workflow_runs': [
-            {'head_sha': '1', 'status': 'completed',
-                'conclusion': 'success', 'name': Workflow_builds.LINUX}
-        ]}
-
         from github.Workflow import Workflow
         workflow = MagicMock(Workflow)
         workflow.id = 1
@@ -785,7 +780,11 @@ class TestControllers(BaseTestCase):
         workflow_run1.status = 'completed'
         workflow_run1.conclusion = 'success'
         workflow_run1.name = Workflow_builds.LINUX
-        mock_repo.return_value.get_workflow_runs.return_value = [workflow_run1]
+
+        workflow_run2 = MagicMock(WorkflowRun)
+        workflow_run2.head_sha = '2'
+
+        mock_repo.return_value.get_workflow_runs.return_value = [workflow_run2, workflow_run1]
 
         with self.app.test_client() as c:
             response = c.post(
@@ -830,7 +829,7 @@ class TestControllers(BaseTestCase):
         """Test webhook triggered with workflow run event with action completed and status failure."""
         data = {'action': 'completed',
                 'workflow_run': {'event': 'push',
-                                 'name': Workflow_builds.LINUX, 'head_sha': '1',
+                                 'name': Workflow_builds.WINDOWS, 'head_sha': '1',
                                  'head_branch': 'master'}, 'sender': {'login': 'test_owner'}}
 
         from github.Workflow import Workflow
@@ -861,10 +860,43 @@ class TestControllers(BaseTestCase):
                 data=json.dumps(data), headers=self.generate_header(data, 'workflow_run'))
         mock_deschedule_test.assert_called()
 
+    @mock.patch('mod_ci.controllers.deschedule_test')
+    @mock.patch('mod_ci.controllers.schedule_test')
+    @mock.patch('github.Github.get_repo')
+    @mock.patch('requests.get', side_effect=mock_api_request_github)
+    def test_webhook_workflow_run_running(self, mock_request, mock_repo, mock_schedule_test, mock_deschedule_test):
+        """Test webhook triggered with workflow run event where github actions is still in progress."""
+        data = {'action': 'completed',
+                'workflow_run': {'event': 'push',
+                                 'name': Workflow_builds.WINDOWS, 'head_sha': '1',
+                                 'head_branch': 'master'}, 'sender': {'login': 'test_owner'}}
+
+        from github.Workflow import Workflow
+        workflow = MagicMock(Workflow)
+        workflow.id = 1
+        workflow.name = Workflow_builds.WINDOWS
+        mock_repo.return_value.get_workflows.return_value = [workflow]
+
+        from github.WorkflowRun import WorkflowRun
+        workflow_run1 = MagicMock(WorkflowRun)
+        workflow_run1.head_sha = '1'
+        workflow_run1.workflow_id = 1
+        workflow_run1.status = 'not_completed_yet'
+        workflow_run1.name = Workflow_builds.WINDOWS
+        mock_repo.return_value.get_workflow_runs.return_value = [workflow_run1]
+
+        with self.app.test_client() as c:
+            response = c.post(
+                '/start-ci', environ_overrides=WSGI_ENVIRONMENT,
+                data=json.dumps(data), headers=self.generate_header(data, 'workflow_run'))
+
+        mock_schedule_test.assert_not_called()
+        mock_deschedule_test.assert_not_called()
+
     @mock.patch('github.Github.get_repo')
     @mock.patch('mod_ci.controllers.schedule_test')
     @mock.patch('requests.get', side_effect=mock_api_request_github)
-    def test_webhook_workflow_run_requested_invalid_workflow_name(self, mock_requests, mock_schedule_test, mock_repo):
+    def test_webhook_workflow_run_requested_invalid_workflow_name(self, mock_request, mock_schedule_test, mock_repo):
         """Test webhook triggered with workflow run event with an invalid action."""
         data = {'action': 'requested', 'workflow_run': {
             'name': 'Invalid', 'head_sha': 'abcdef'}}
