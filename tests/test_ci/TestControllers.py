@@ -1149,7 +1149,7 @@ class TestControllers(BaseTestCase):
     def test_webhook_issue_opened(self, mock_issue, mock_mailing, mock_requests, mock_github):
         """Test webhook triggered with issues event with opened action."""
         data = {'action': 'opened',
-                'issue': {'number': 1234, 'title': 'testTitle', 'body': 'testing', 'state': 'opened',
+                'issue': {'number': '1234', 'title': 'testTitle', 'body': 'testing', 'state': 'opened',
                           'user': {'login': 'testAuthor'}}}
         with self.app.test_client() as c:
             response = c.post(
@@ -1157,8 +1157,7 @@ class TestControllers(BaseTestCase):
                 data=json.dumps(data), headers=self.generate_header(data, 'issues'))
 
         self.assertEqual(response.data, b'{"msg": "EOL"}')
-        mock_issue.query.filter(mock_issue.issue_id == '1234')
-        mock_mailing.assert_called_once_with(mock.ANY, 1234, 'testTitle', 'testAuthor', 'testing')
+        mock_mailing.assert_called_once_with(mock.ANY, '1234', 'testTitle', 'testAuthor', 'testing')
 
     @mock.patch('github.Github')
     @mock.patch('run.log.critical')
