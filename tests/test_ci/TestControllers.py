@@ -653,13 +653,19 @@ class TestControllers(BaseTestCase):
             last_release = CCExtractorVersion.query.order_by(CCExtractorVersion.released.desc()).first()
             self.assertNotEqual(last_release.version, '2.1')
 
-    def test_webhook_push_no_after(self):
+    @mock.patch('github.Github.get_repo')
+    @mock.patch('requests.get', side_effect=mock_api_request_github)
+    @mock.patch('run.log')
+    def test_webhook_push_no_after(self, mock_log, mock_request, mock_repo):
         """Test webhook triggered with push event without 'after' in payload."""
         data = {'no_after': 'test'}
         with self.app.test_client() as c:
             response = c.post(
                 '/start-ci', environ_overrides=WSGI_ENVIRONMENT,
                 data=json.dumps(data), headers=self.generate_header(data, 'push'))
+
+        mock_log.debug.assert_called_with("push event detected")
+        mock_log.warning.assert_any_call("Unknown push type! Dumping payload for analysis")
 
     @mock.patch('github.Github.get_repo')
     @mock.patch('requests.get', side_effect=mock_api_request_github)
@@ -1036,9 +1042,9 @@ class TestControllers(BaseTestCase):
 
     def test_start_ci_with_a_get_request(self):
         """Test start_ci function with a request method other than post."""
-        from mod_ci.controllers import start_ci
-        response = start_ci()
-        self.assertEqual(response, 'OK')
+        with self.app.test_client() as c:
+            response = c.get('/start-ci', environ_overrides=WSGI_ENVIRONMENT, headers=self.generate_header({}, 'test'))
+            self.assertEqual(response.data, b'OK')
 
     @mock.patch('github.Github')
     @mock.patch('run.log.debug')
