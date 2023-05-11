@@ -1076,44 +1076,39 @@ class TestControllers(BaseTestCase):
         mock_debug.assert_called_with('Created tests, waiting for cron...')
         mock_critical.assert_called_with(f"Could not post to GitHub! Response: {response_data}")
 
-    @mock.patch('run.log.critical')
-    @mock.patch('run.log.debug')
+    @mock.patch('run.log')
     @mock.patch('github.Github')
-    def test_schedule_test_function(self, git_mock, mock_debug, mock_critical):
+    def test_schedule_test_function(self, git_mock, mock_log):
         """Check the functioning of schedule_test function."""
         from mod_ci.controllers import schedule_test
         repository = git_mock(g.github['bot_token']).get_repo(
             f"{g.github['repository_owner']}/{g.github['repository']}")
         schedule_test(repository.get_commit(1))
-        mock_debug.assert_not_called()
-        schedule_test(None)
-        mock_debug.assert_not_called()
+        mock_log.debug.assert_not_called()
+        mock_log.critical.assert_not_called()
 
-    @mock.patch('run.log.critical')
-    @mock.patch('run.log.debug')
+        mock_log.reset_mock()
+        schedule_test(None)
+        mock_log.debug.assert_not_called()
+        mock_log.critical.assert_not_called()
+
+    @mock.patch('run.log')
     @mock.patch('github.Github')
-    def test_deschedule_test_function_linux(self, git_mock, mock_debug, mock_critical):
+    def test_deschedule_test_function(self, git_mock, mock_log):
         """Check the functioning of deschedule_test function on linux platform."""
         from mod_ci.controllers import deschedule_test
         repository = git_mock(g.github['bot_token']).get_repo(
             f"{g.github['repository_owner']}/{g.github['repository']}")
-        deschedule_test(repository.get_commit(1), 1, TestType.commit, TestPlatform.linux)
-        mock_debug.assert_not_called()
-        deschedule_test(None, 1, TestType.commit, TestPlatform.linux)
-        mock_debug.assert_not_called()
+        commit = Test.query.filter(Test.platform == TestPlatform.linux).first().commit
+        deschedule_test(repository.get_commit(commit), commit, TestType.pull_request, TestPlatform.linux)
+        mock_log.debug.assert_called_once_with("pull request test type detected")
+        mock_log.critical.assert_not_called()
 
-    @mock.patch('run.log.critical')
-    @mock.patch('run.log.debug')
-    @mock.patch('github.Github')
-    def test_deschedule_test_function_windows(self, git_mock, mock_debug, mock_critical):
-        """Check the functioning of deschedule_test function on windows platform."""
-        from mod_ci.controllers import deschedule_test
-        repository = git_mock(g.github['bot_token']).get_repo(
-            f"{g.github['repository_owner']}/{g.github['repository']}")
-        deschedule_test(repository.get_commit(1), 1, TestType.commit, TestPlatform.windows)
-        mock_debug.assert_not_called()
-        deschedule_test(None, 1, TestType.commit, TestPlatform.windows)
-        mock_debug.assert_not_called()
+        # Test deschedule function with github commit None
+        mock_log.reset_mock()
+        deschedule_test(None, 1, TestType.commit, TestPlatform.linux)
+        mock_log.debug.assert_not_called()
+        mock_log.critical.assert_not_called()
 
     @mock.patch('github.Github.get_repo')
     @mock.patch('requests.get', side_effect=mock_api_request_github)
