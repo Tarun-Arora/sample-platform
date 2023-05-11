@@ -330,8 +330,9 @@ class TestControllers(BaseTestCase):
         """Check comments in passed PR test."""
         import mod_ci.controllers
         reload(mod_ci.controllers)
-        from mod_ci.controllers import Status, comment_pr
         from github.IssueComment import IssueComment
+
+        from mod_ci.controllers import Status, comment_pr
 
         repository = mock_github(g.github['bot_token']).get_repo(
             f"{g.github['repository_owner']}/{g.github['repository']}")
