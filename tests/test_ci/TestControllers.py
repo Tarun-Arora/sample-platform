@@ -331,17 +331,39 @@ class TestControllers(BaseTestCase):
         import mod_ci.controllers
         reload(mod_ci.controllers)
         from mod_ci.controllers import Status, comment_pr
+        from github.IssueComment import IssueComment
 
-        # Comment on test that passes all regression tests
+        repository = mock_github(g.github['bot_token']).get_repo(
+            f"{g.github['repository_owner']}/{g.github['repository']}")
+        pull_request = repository.get_pull(number=1)
+
+        comment1 = MagicMock(IssueComment)
+        comment1.user.login = 'invalid'
+
+        comment2 = MagicMock(IssueComment)
+        comment2.user.login = ''
+        comment2.body = 'linux test passed'
+
+        # When previous comment is found, and is to be edited
+        pull_request.get_issue_comments.return_value = [comment1, comment2]
         comment_pr(1, Status.SUCCESS, 1, 'linux')
         mock_github.assert_called_with(g.github['bot_token'])
         mock_github(g.github['bot_token']).get_repo.assert_called_with(
             f"{g.github['repository_owner']}/{g.github['repository']}")
-        repository = mock_github(g.github['bot_token']).get_repo(
-            f"{g.github['repository_owner']}/{g.github['repository']}")
+
         repository.get_pull.assert_called_with(number=1)
-        pull_request = repository.get_pull(number=1)
-        pull_request.get_issue_comments.assert_called_with()
+        pull_request.get_issue_comments.assert_called_once()
+        args, kwargs = comment2.edit.call_args
+        message = kwargs['body']
+        if "passed" not in message:
+            assert False, "Message not Correct"
+
+        # When commit is not found, and is to be created
+        pull_request.reset_mock()
+        pull_request.get_issue_comments.return_value = [comment1]
+        comment_pr(1, Status.SUCCESS, 1, 'linux')
+        repository.get_pull.assert_called_with(number=1)
+        pull_request.get_issue_comments.assert_called_once()
         args, kwargs = pull_request.create_issue_comment.call_args
         message = kwargs['body']
         if "passed" not in message:
