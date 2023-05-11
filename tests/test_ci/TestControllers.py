@@ -844,7 +844,7 @@ class TestControllers(BaseTestCase):
         workflow_run1.head_sha = '1'
         workflow_run1.workflow_id = 1
         workflow_run1.status = 'completed'
-        workflow_run1.conclusion = 'success'
+        workflow_run1.conclusion = 'failure'
         workflow_run1.name = Workflow_builds.WINDOWS
         mock_repo.return_value.get_workflow_runs.return_value = [workflow_run1]
 
