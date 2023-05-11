@@ -1145,9 +1145,10 @@ class TestControllers(BaseTestCase):
     @mock.patch('github.Github.get_repo')
     @mock.patch('requests.get', side_effect=mock_api_request_github)
     @mock.patch('mod_ci.controllers.inform_mailing_list')
-    @mock.patch('mod_sample.models.Issue')
-    def test_webhook_issue_opened(self, mock_issue, mock_mailing, mock_requests, mock_github):
+    @mock.patch('mod_sample.models.Issue.query')
+    def test_webhook_issue_opened(self, mock_issue, mock_mailing, mock_request, mock_github):
         """Test webhook triggered with issues event with opened action."""
+        from mod_sample.models import Issue
         data = {'action': 'opened',
                 'issue': {'number': '1234', 'title': 'testTitle', 'body': 'testing', 'state': 'opened',
                           'user': {'login': 'testAuthor'}}}
