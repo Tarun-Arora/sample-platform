@@ -2,8 +2,7 @@ name: Deploy sample platform
 
 on:
   workflow_dispatch:
-  push:
-    branches: [ master ]
+  workflow_call:
 
 env:
   DEPLOY_BRANCH: master
