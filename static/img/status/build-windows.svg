@@ -1,1 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" height="88" width="88" xmlns:v="https://vecta.io/nano"><path d="M0 12.402l35.687-4.86.016 34.423-35.67.203zm35.67 33.529l.028 34.453L.028 75.48.026 45.7zm4.326-39.025L87.314 0v41.527l-47.318.376zm47.329 39.349l-.011 41.34-47.318-6.678-.066-34.739z" fill="#00adef"/></svg>
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="20px" height="20px" viewBox="0 0 20 20" version="1.1">
+<g id="surface1">
+<path style=" stroke:none;fill-rule:nonzero;fill:rgb(0%,67.843137%,93.72549%);fill-opacity:1;" d="M 0 2.820312 L 8.109375 1.714844 L 8.113281 9.539062 L 0.0078125 9.582031 Z M 8.105469 10.4375 L 8.113281 18.269531 L 0.0078125 17.15625 L 0.0078125 10.386719 Z M 9.089844 1.570312 L 19.84375 0 L 19.84375 9.4375 L 9.089844 9.523438 Z M 19.847656 10.511719 L 19.84375 19.90625 L 9.089844 18.390625 L 9.074219 10.496094 Z M 19.847656 10.511719 "/>
+</g>
+</svg>
