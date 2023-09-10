@@ -85,7 +85,9 @@ class TestControllers(BaseTestCase):
         test: Test = Test.query.filter(Test.id == TEST_RUN_ID).first()
         comment_info = get_info_for_pr_comment(test.id)
         # we got a valid variant, so should still pass
-        self.assertEqual(comment_info.failed_tests, [])
+        self.assertEqual(comment_info.common_failed_tests, [])
+        self.assertEqual(comment_info.extra_failed_tests, [])
+        self.assertEqual(comment_info.fixed_tests, [])
         for stats in comment_info.category_stats:
             # make sure the stats for the category confirm that everything passed too
             self.assertEqual(stats.success, stats.total)
@@ -256,20 +258,38 @@ class TestControllers(BaseTestCase):
         mock_create_instance.assert_called_once()
         mock_wait_for_operation.assert_called_once()
 
+    @mock.patch('github.Github.get_repo')
     @mock.patch('mod_ci.controllers.start_test')
     @mock.patch('mod_ci.controllers.get_compute_service_object')
     @mock.patch('mod_ci.controllers.g')
-    def test_gcp_instance(self, mock_g, mock_get_compute_service_object, mock_start_test):
+    def test_gcp_instance(self, mock_g, mock_get_compute_service_object, mock_start_test, mock_repo):
         """Test gcp_instance function."""
         from mod_ci.controllers import gcp_instance
 
-        # Making a sample test invalid
-        test = Test.query.get(1)
-        test.pr_nr = 0
-        g.db.commit()
-        gcp_instance(self.app, mock_g.db, TestPlatform.linux, mock.ANY, None)
+        repo = mock_repo()
 
-        mock_start_test.assert_called_once()
+        # Making test with id 1 invalid with pr_nr = 0
+        test_1 = Test.query.get(1)
+        test_1.pr_nr = 0
+
+        # Making pr of test with id 2 already updated
+        test_2 = Test.query.get(2)
+        pr_head_sha = test_2.commit + 'f'
+        repo.get_pull.return_value.head.sha = pr_head_sha
+        repo.get_pull.return_value.state = 'open'
+
+        # Creating a test with pull_request type that is valid
+        test_3 = Test(TestPlatform.linux, TestType.pull_request, 1, "pull_request", pr_head_sha, 2)
+        g.db.add(test_3)
+
+        # Creating a test with commit type that is valid
+        test_4 = Test(TestPlatform.linux, TestType.commit, 1, "master", pr_head_sha)
+        g.db.add(test_4)
+        g.db.commit()
+
+        gcp_instance(self.app, mock_g.db, TestPlatform.linux, repo, None)
+
+        self.assertEqual(mock_start_test.call_count, 2)
         mock_get_compute_service_object.assert_called_once()
 
     def test_get_compute_service_object(self):
@@ -359,7 +379,7 @@ class TestControllers(BaseTestCase):
 
         # Delete old bot comments and create a new comment
         pull_request.get_issue_comments.return_value = [comment1, comment2]
-        comment_pr(1, Status.SUCCESS, 1, 'linux')
+        comment_pr(1, 1, 'linux')
         mock_github.assert_called_with(g.github['bot_token'])
         mock_github(g.github['bot_token']).get_repo.assert_called_with(
             f"{g.github['repository_owner']}/{g.github['repository']}")
@@ -387,7 +407,7 @@ class TestControllers(BaseTestCase):
                    "test files on <b>linux</b>. Below is a summary of the test results")
         pull_request.get_issue_comments.return_value = [MagicMock(IssueComment)]
         # Comment on test that fails some/all regression tests
-        comment_pr(2, Status.FAILURE, 1, 'linux')
+        comment_pr(2, 1, 'linux')
         pull_request.get_issue_comments.assert_called_with()
         args, kwargs = pull_request.create_issue_comment.call_args
         message = kwargs['body']
@@ -459,9 +479,10 @@ class TestControllers(BaseTestCase):
         self.assertIn(2, customized_test)
         self.assertNotIn(1, customized_test)
 
+    @mock.patch('flask.g.log.error')
     @mock.patch('mailer.Mailer')
     @mock.patch('mod_ci.controllers.get_html_issue_body')
-    def test_inform_mailing_list(self, mock_get_html_issue_body, mock_email):
+    def test_inform_mailing_list(self, mock_get_html_issue_body, mock_email, mock_log_error):
         """Test the inform_mailing_list function."""
         from mod_ci.controllers import inform_mailing_list
 
@@ -482,6 +503,11 @@ class TestControllers(BaseTestCase):
             }
         )
         mock_get_html_issue_body.assert_called_once()
+        mock_log_error.assert_not_called()
+
+        mock_email.send_simple_message.return_value = False
+        inform_mailing_list(mock_email, "matejmecka", "2430", "Some random string", "Lorem Ipsum sit dolor amet...")
+        mock_log_error.assert_called_once()
 
     @staticmethod
     @mock.patch('mod_ci.controllers.markdown')
@@ -499,9 +525,21 @@ class TestControllers(BaseTestCase):
 
         mock_markdown.assert_called_once_with(body, extras=["target-blank-links", "task_list", "code-friendly"])
 
-    def test_add_blocked_users(self):
+    @mock.patch('mod_ci.controllers.update_status_on_github')
+    @mock.patch('github.Github.get_repo')
+    def test_add_blocked_users(self, mock_repo, mock_update_gh_status):
         """Check adding a user to block list."""
+        from github.PullRequest import PullRequest
         self.create_user_with_role(self.user.name, self.user.email, self.user.password, Role.admin)
+        mock_pr = MagicMock(PullRequest)
+        mock_pr.user.id = 1
+        mock_pr.number = 3
+        mock_repo.return_value.get_pulls.return_value = [mock_pr]
+
+        new_test = Test(TestPlatform.linux, TestType.pull_request, 1, "test", "test", 3)
+        g.db.add(new_test)
+        g.db.commit()
+
         with self.app.test_client() as c:
             c.post("/account/login", data=self.create_login_form_data(self.user.email, self.user.password))
             c.post("/blocked_users", data=dict(user_id=1, comment="Bad user", add=True))
@@ -741,34 +779,6 @@ class TestControllers(BaseTestCase):
 
         mock_test.query.filter.assert_called_once()
 
-    @mock.patch('github.Github.get_repo')
-    @mock.patch('mod_ci.controllers.Test')
-    @mock.patch('requests.get', side_effect=mock_api_request_github)
-    def test_webhook_pr_converted_to_draft(self, mock_requests, mock_test, mock_repo):
-        """Test webhook triggered with pull_request event with converted_to_draft action."""
-        platform_name = "platform"
-
-        class MockTest:
-            def __init__(self):
-                self.id = 1
-                self.progress = []
-                self.platform = MockPlatform(platform_name)
-                self.commit = "test"
-
-        mock_test.query.filter.return_value.all.return_value = [MockTest()]
-        mock_repo.return_value.get_commit.return_value.get_statuses.return_value = [
-            {"context": f"CI - {platform_name}"}]
-
-        data = {'action': 'converted_to_draft',
-                'pull_request': {'number': 1234, 'draft': False}}
-        # one of ip address from GitHub web hook
-        with self.app.test_client() as c:
-            response = c.post(
-                '/start-ci', environ_overrides=WSGI_ENVIRONMENT,
-                data=json.dumps(data), headers=self.generate_header(data, 'pull_request'))
-
-        mock_test.query.filter.assert_called_once()
-
     @mock.patch('mod_ci.controllers.BlockedUsers')
     @mock.patch('github.Github.get_repo')
     @mock.patch('requests.get', side_effect=mock_api_request_github)
@@ -793,25 +803,6 @@ class TestControllers(BaseTestCase):
         mock_blocked.query.filter.return_value.first.return_value = None
 
         data = {'action': 'opened',
-                'pull_request': {'number': 1234, 'head': {'sha': 'abcd1234'}, 'user': {'id': 'test'}, 'draft': False}}
-        with self.app.test_client() as c:
-            response = c.post(
-                '/start-ci', environ_overrides=WSGI_ENVIRONMENT,
-                data=json.dumps(data), headers=self.generate_header(data, 'pull_request'))
-
-        self.assertEqual(response.data, b'{"msg": "EOL"}')
-        mock_blocked.query.filter.assert_called_once_with(mock_blocked.user_id == 'test')
-        mock_add_test_entry.assert_called_once()
-
-    @mock.patch('mod_ci.controllers.BlockedUsers')
-    @mock.patch('github.Github.get_repo')
-    @mock.patch('mod_ci.controllers.add_test_entry')
-    @mock.patch('requests.get', side_effect=mock_api_request_github)
-    def test_webhook_pr_ready_for_review(self, mock_request, mock_add_test_entry, mock_repo, mock_blocked):
-        """Test webhook triggered with pull_request event with ready_for_review action."""
-        mock_blocked.query.filter.return_value.first.return_value = None
-
-        data = {'action': 'ready_for_review',
                 'pull_request': {'number': 1234, 'head': {'sha': 'abcd1234'}, 'user': {'id': 'test'}, 'draft': False}}
         with self.app.test_client() as c:
             response = c.post(
@@ -1292,10 +1283,8 @@ class TestControllers(BaseTestCase):
         schedule_test(github_status)
         mock_critical.assert_called()
         mock_critical.reset_mock()
-        deschedule_test(github_status, 1, TestType.commit, TestPlatform.linux)
-        mock_critical.assert_called()
-        mock_critical.reset_mock()
-        deschedule_test(github_status, 1, TestType.commit, TestPlatform.windows)
+        test = Test.query.first()
+        deschedule_test(github_status, test=test, db=g.db)
         mock_critical.assert_called()
 
     @mock.patch('mod_ci.controllers.is_main_repo')

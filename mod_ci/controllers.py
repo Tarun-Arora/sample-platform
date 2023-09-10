@@ -33,7 +33,7 @@ from mod_auth.controllers import check_access_rights, login_required
 from mod_auth.models import Role
 from mod_ci.forms import AddUsersToBlacklist, DeleteUserForm
 from mod_ci.models import (BlockedUsers, GcpInstance, MaintenanceMode,
-                           PrCommentInfo)
+                           PrCommentInfo, Status)
 from mod_customized.models import CustomizedTest
 from mod_home.models import CCExtractorVersion, GeneralData
 from mod_regression.models import (Category, RegressionTest,
@@ -46,15 +46,6 @@ from mod_test.models import (Fork, Test, TestPlatform, TestProgress,
 from utility import is_valid_signature, request_from_github
 
 mod_ci = Blueprint('ci', __name__)
-
-
-class Status:
-    """Define different states for the tests."""
-
-    PENDING = "pending"
-    SUCCESS = "success"
-    ERROR = "error"
-    FAILURE = "failure"
 
 
 class Workflow_builds(DeclEnum):
@@ -211,7 +202,7 @@ def gcp_instance(app, db, platform, repository, delay) -> None:
     :param app: The Flask app
     :type app: Flask
     :param db: database connection
-    :type db: sqlalchemy.orm.scoped_session
+    :type db: sqlalchemy.orm.scoping.scoped_session
     :param platform: operating system
     :type platform: str
     :param repository: repository to run tests on
@@ -248,11 +239,20 @@ def gcp_instance(app, db, platform, repository, delay) -> None:
     compute = get_compute_service_object()
 
     for test in pending_tests:
-        if test.test_type == TestType.pull_request and test.pr_nr == 0:
-            log.warn(f'[{platform}] Test {test.id} is invalid, deleting')
-            db.delete(test)
-            db.commit()
-            continue
+        if test.test_type == TestType.pull_request:
+            gh_commit = repository.get_commit(test.commit)
+            if test.pr_nr == 0:
+                log.warn(f'[{platform}] Test {test.id} is invalid')
+                deschedule_test(gh_commit, message="Invalid PR number", test=test, db=db)
+                continue
+            test_pr = repository.get_pull(test.pr_nr)
+            if test.commit != test_pr.head.sha:
+                log.warn(f'[{platform}] Test {test.id} is invalid')
+                deschedule_test(gh_commit, message="PR closed or updated", test=test, db=db)
+                continue
+            if test_pr.state != 'open':
+                log.debug(f"PR {test.pr_nr} not in open state, skipping test {test.id}")
+                continue
         start_test(compute, app, db, repository, test, github_config['bot_token'])
 
 
@@ -281,7 +281,7 @@ def start_test(compute, app, db, repository: Repository.Repository, test, bot_to
     :param app: The Flask app
     :type app: Flask
     :param db: database connection
-    :type db: sqlalchemy.orm.scoped_session
+    :type db: sqlalchemy.orm.scoping.scoped_session
     :param platform: operating system
     :type platform: str
     :param repository: repository to run tests on
@@ -616,7 +616,7 @@ def add_test_entry(db, commit, test_type, branch="master", pr_nr=0) -> None:
     Add test details entry into Test model for each platform.
 
     :param db: Database connection.
-    :type db: sqlalchemy.orm.scoped_session
+    :type db: sqlalchemy.orm.scoping.scoped_session
     :param gh_commit: The GitHub API call for the commit. Can be None
     :type gh_commit: Any
     :param commit: The commit hash.
@@ -690,8 +690,8 @@ def update_status_on_github(gh_commit: Commit.Commit, state, description, contex
         log.critical(f'Could not post to GitHub! Response: {a.data}')
 
 
-def deschedule_test(gh_commit: Commit.Commit, commit, test_type, platform, branch="master",
-                    message="Tests have been cancelled", state=Status.FAILURE) -> None:
+def deschedule_test(gh_commit: Commit.Commit, commit=None, test_type=None, platform=None, branch="master",
+                    message="Tests have been cancelled", state=Status.FAILURE, test=None, db=None) -> None:
     """
     Post status to GitHub (default: as failure due to GitHub Actions incompletion).
 
@@ -709,32 +709,37 @@ def deschedule_test(gh_commit: Commit.Commit, commit, test_type, platform, branc
     :type message: str
     :param state: The status badge of the test
     :type state: Status
+    :param test: The test which is to be canceled (optional)
+    :type state: Test
+    :param db: db session
+    :type db: sqlalchemy.orm.scoping.scoped_session
     :return: Nothing
     :rtype: None
     """
     from run import log
 
-    fork_url = f"%/{g.github['repository_owner']}/{g.github['repository']}.git"
-    fork = Fork.query.filter(Fork.github.like(fork_url)).first()
-
     if test_type == TestType.pull_request:
         log.debug('pull request test type detected')
         branch = "pull_request"
 
-    platform_test = Test.query.filter(and_(Test.platform == platform,
-                                           Test.commit == commit,
-                                           Test.fork_id == fork.id,
-                                           Test.test_type == test_type,
-                                           Test.branch == branch,
-                                           )).first()
+    if test is None:
+        fork_url = f"%/{g.github['repository_owner']}/{g.github['repository']}.git"
+        fork = Fork.query.filter(Fork.github.like(fork_url)).first()
+        test = Test.query.filter(and_(Test.platform == platform,
+                                      Test.commit == commit,
+                                      Test.fork_id == fork.id,
+                                      Test.test_type == test_type,
+                                      Test.branch == branch,
+                                      )).first()
 
-    if platform_test is not None:
-        progress = TestProgress(platform_test.id, TestStatus.canceled, message, datetime.datetime.now())
-        g.db.add(progress)
-        g.db.commit()
+    if test is not None:
+        progress = TestProgress(test.id, TestStatus.canceled, message, datetime.datetime.now())
+        db = db or g.db
+        db.add(progress)
+        db.commit()
 
-    if gh_commit is not None:
-        update_status_on_github(gh_commit, state, message, f"CI - {platform.value}")
+        if gh_commit is not None:
+            update_status_on_github(gh_commit, state, message, f"CI - {test.platform.value}")
 
 
 def queue_test(gh_commit: Commit.Commit, commit, test_type, platform, branch="master", pr_nr=0) -> None:
@@ -900,12 +905,11 @@ def start_ci():
             # If it's a valid PR, run the tests
             pr_nr = payload['pull_request']['number']
 
-            is_draft = payload['pull_request']['draft']
             action = payload['action']
-            is_active = action in ['opened', 'synchronize', 'reopened', 'ready_for_review']
-            is_inactive = action in ['closed', 'converted_to_draft']
+            is_active = action in ['opened', 'synchronize', 'reopened']
+            is_inactive = action in ['closed']
 
-            if not is_draft and is_active:
+            if is_active:
                 try:
                     commit_hash = payload['pull_request']['head']['sha']
                 except KeyError:
@@ -934,15 +938,13 @@ def start_ci():
                     progress = TestProgress(test.id, TestStatus.canceled, f"PR {pr_action}", datetime.datetime.now())
                     g.db.add(progress)
                     g.db.commit()
+                    gh_commit = repository.get_commit(test.commit)
                     # If test run status exists, mark them as cancelled
-                    for status in repository.get_commit(test.commit).get_statuses():
+                    for status in gh_commit.get_statuses():
                         if status["context"] == f"CI - {test.platform.value}":
-                            repository.get_commit(test.commit).create_status(
-                                state=Status.FAILURE,
-                                description="Tests cancelled",
-                                context=f"CI - {test.platform.value}",
-                                target_url=url_for('test.by_id', test_id=test.id, _external=True)
-                            )
+                            target_url = url_for('test.by_id', test_id=test.id, _external=True)
+                            update_status_on_github(gh_commit, Status.FAILURE, "Tests canceled",
+                                                    status["context"], target_url=target_url)
 
         elif event == "issues":
             g.log.debug('issues event detected')
@@ -1290,17 +1292,14 @@ def progress_type_request(log, test, test_id, request) -> bool:
             state = Status.SUCCESS
             message = 'Tests completed'
         if test.test_type == TestType.pull_request:
-            comment_pr(test.id, state, test.pr_nr, test.platform.name)
+            state = comment_pr(test.id, test.pr_nr, test.platform.name)
         update_build_badge(state, test)
 
     else:
         message = progress.message
 
     gh_commit = repository.get_commit(test.commit)
-    try:
-        gh_commit.create_status(state=state, description=message, context=context, target_url=target_url)
-    except GithubException as a:
-        log.error(f'Got an exception while posting to GitHub! Message: {a.data}')
+    update_status_on_github(gh_commit, state, message, context, target_url=target_url)
 
     if status in [TestStatus.completed, TestStatus.canceled]:
         # Delete the current instance
@@ -1590,11 +1589,14 @@ def get_query_regression_testid_passed(test_id: int) -> Query:
 
 def get_info_for_pr_comment(test_id: int) -> PrCommentInfo:
     """Return info about the given test id for use in a PR comment."""
-    regression_testid_passed = get_query_regression_testid_passed(test_id)
+    last_test_master = g.db.query(Test).filter(Test.branch == "master", Test.test_type == TestType.commit).join(
+        TestProgress, Test.id == TestProgress.test_id).filter(
+            TestProgress.status == TestStatus.completed).order_by(TestProgress.id.desc()).first()
+    regression_test_passed = get_query_regression_testid_passed(test_id)
 
     passed = g.db.query(label('category_id', Category.id), label(
         'success', count(regressionTestLinkTable.c.regression_id))).filter(
-            regressionTestLinkTable.c.regression_id.in_(regression_testid_passed),
+            regressionTestLinkTable.c.regression_id.in_(regression_test_passed),
             Category.id == regressionTestLinkTable.c.category_id).group_by(
             regressionTestLinkTable.c.category_id).subquery()
     tot = g.db.query(label('category', Category.name), label('total', count(regressionTestLinkTable.c.regression_id)),
@@ -1602,11 +1604,17 @@ def get_info_for_pr_comment(test_id: int) -> PrCommentInfo:
         passed, passed.c.category_id == Category.id).filter(
         Category.id == regressionTestLinkTable.c.category_id).group_by(
         regressionTestLinkTable.c.category_id).all()
-    regression_testid_failed = RegressionTest.query.filter(RegressionTest.id.notin_(regression_testid_passed)).all()
-    return PrCommentInfo(tot, regression_testid_failed)
+    regression_test_failed = RegressionTest.query.filter(RegressionTest.id.notin_(regression_test_passed)).all()
+
+    last_test_master_id = last_test_master.id if last_test_master else 0
+    extra_failed_tests = [test for test in regression_test_failed if test.last_passed_on == last_test_master]
+    fixed_tests = RegressionTest.query.filter(RegressionTest.id.in_(regression_test_passed),
+                                              RegressionTest.last_passed_on != last_test_master_id).all()
+    common_failed_tests = [test for test in regression_test_failed if test.last_passed_on != last_test_master]
+    return PrCommentInfo(tot, extra_failed_tests, fixed_tests, common_failed_tests, last_test_master)
 
 
-def comment_pr(test_id, state, pr_nr, platform) -> None:
+def comment_pr(test_id, pr_nr, platform) -> str:
     """
     Upload the test report to the GitHub PR as comment.
 
@@ -1623,8 +1631,7 @@ def comment_pr(test_id, state, pr_nr, platform) -> None:
 
     comment_info = get_info_for_pr_comment(test_id)
     template = app.jinja_env.get_or_select_template('ci/pr_comment.txt')
-    message = template.render(tests=comment_info.category_stats, failed_tests=comment_info.failed_tests,
-                              test_id=test_id, state=state, platform=platform)
+    message = template.render(comment_info=comment_info, test_id=test_id, platform=platform)
     log.debug(f"GitHub PR Comment Message Created for Test_id: {test_id}")
     try:
         gh = Github(g.github['bot_token'])
@@ -1641,6 +1648,7 @@ def comment_pr(test_id, state, pr_nr, platform) -> None:
         log.debug(f"GitHub PR Comment ID {comment.id} Uploaded for Test_id: {test_id}")
     except Exception as e:
         log.error(f"GitHub PR Comment Failed for Test_id: {test_id} with Exception {e}")
+    return Status.SUCCESS if len(comment_info.extra_failed_tests) == 0 else Status.FAILURE
 
 
 @mod_ci.route('/show_maintenance')
@@ -1704,9 +1712,9 @@ def blocked_users():
             # Getting all pull requests by blocked user on the repo
             pulls = repository.get_pulls(state='open')
             for pull in pulls:
-                if pull['user']['id'] != add_user_form.user_id.data:
+                if pull.user.id != add_user_form.user_id.data:
                     continue
-                tests = Test.query.filter(Test.pr_nr == pull['number']).all()
+                tests = Test.query.filter(Test.pr_nr == pull.number).all()
                 for test in tests:
                     # Add canceled status only if the test hasn't started yet
                     if len(test.progress) > 0:
@@ -1714,15 +1722,11 @@ def blocked_users():
                     progress = TestProgress(test.id, TestStatus.canceled, "PR closed", datetime.datetime.now())
                     g.db.add(progress)
                     g.db.commit()
-                    try:
-                        repository.get_commit(test.commit).create_status(
-                            state=Status.FAILURE,
-                            description="Tests canceled since user blacklisted",
-                            context=f"CI - {test.platform.value}",
-                            target_url=url_for('test.by_id', test_id=test.id, _external=True)
-                        )
-                    except GithubException as a:
-                        g.log.error(f"Got an exception while posting to GitHub! Message: {a.data}")
+                    gh_commit = repository.get_commit(test.commit)
+                    message = "Tests canceled since user blacklisted"
+                    target_url = url_for('test.by_id', test_id=test.id, _external=True)
+                    update_status_on_github(gh_commit, Status.FAILURE, message,
+                                            f"CI - {test.platform.value}", target_url=target_url)
         except GithubException as a:
             g.log.error(f"Pull Requests of Blocked User could not be fetched: {a.data}")
 
